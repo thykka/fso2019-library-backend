@@ -22,7 +22,6 @@ module.exports = {
         "array-callback-return": "error",
         "array-element-newline": "off",
         "arrow-body-style": "off",
-        "arrow-parens": "error",
         "arrow-spacing": [
             "error",
             {
@@ -73,7 +72,6 @@ module.exports = {
         "id-blacklist": "error",
         "id-length": "error",
         "id-match": "error",
-        "implicit-arrow-linebreak": "error",
         "indent": "off",
         "indent-legacy": "off",
         "init-declarations": "error",
@@ -98,13 +96,8 @@ module.exports = {
         "max-statements": "error",
         "max-statements-per-line": "error",
         "multiline-comment-style": "off",
-        "multiline-ternary": "error",
         "new-cap": "error",
         "new-parens": "error",
-        "newline-after-var": [
-            "error",
-            "always"
-        ],
         "newline-per-chained-call": "error",
         "no-alert": "error",
         "no-array-constructor": "error",
@@ -127,7 +120,7 @@ module.exports = {
         "no-extend-native": "error",
         "no-extra-bind": "error",
         "no-extra-label": "error",
-        "no-extra-parens": "error",
+        "no-extra-parens": "warn",
         "no-floating-decimal": "error",
         "no-implicit-coercion": "error",
         "no-implicit-globals": "error",
@@ -160,7 +153,6 @@ module.exports = {
         "no-octal-escape": "error",
         "no-param-reassign": "error",
         "no-path-concat": "error",
-        "no-plusplus": "error",
         "no-process-env": "error",
         "no-process-exit": "error",
         "no-proto": "error",
@@ -180,7 +172,6 @@ module.exports = {
         "no-sync": "error",
         "no-tabs": "error",
         "no-template-curly-in-string": "error",
-        "no-ternary": "error",
         "no-throw-literal": "error",
         "no-trailing-spaces": "off",
         "no-undef-init": "error",
@@ -206,7 +197,6 @@ module.exports = {
             "error",
             "always"
         ],
-        "object-property-newline": "error",
         "object-shorthand": "error",
         "one-var": "off",
         "one-var-declaration-per-line": "error",
