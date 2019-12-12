@@ -85,23 +85,63 @@ let books = [
 ]
 
 const typeDefs = gql`
+  type Book {
+    title: String!
+    published: Int!
+    author: String!
+    id: ID!
+    genres: [String!]
+  }
+
+  type Author {
+    name: String!
+    bookCount: Int!
+  }
+
   type Query {
     hello: String!
     bookCount: Int!
     authorCount: Int!
+    allBooks(author: String, genre: String): [Book!]
+    allAuthors: [Author!]!
   }
 `
 
 const resolvers = {
   Query: {
-    hello: () => { return "world" },
     bookCount: () => books.length,
     authorCount: () => Object.keys(
-      books.reduce((authorsObj, book) => {
-        authorsObj[book.author] = true;
-        return authorsObj;
-      }, {})
-    ).length
+        books.reduce((authorsObj, book) => {
+          authorsObj[book.author] = true
+          return authorsObj
+        }, {})
+      ).length,
+    allBooks: (root, { author, genre } = {}) => {
+      let results = [...books];
+      if (author) {
+        results = results.filter(book => book.author === author);
+      }
+      if (genre) {
+        results = results.filter(book =>
+          Array.isArray(book.genres) && book.genres.includes(genre)
+        );
+      }
+      return results;
+    },
+    allAuthors: () => {
+      const authorsObject = books.reduce(
+        (allAuthors, book) => {
+          const name = book.author;
+          const author = allAuthors[name];
+          if (author) {
+            author.bookCount++
+          } else {
+            allAuthors[name] = { name, bookCount: 1 }
+          }
+          return allAuthors
+        }, {});
+      return Object.values(authorsObject);
+    },
   }
 }
 
