@@ -116,6 +116,11 @@ const typeDefs = gql`
       published: Int
       genres: [String!]
     ) : Book
+
+    editAuthor(
+      name: String!
+      setBornTo: Int
+    ) : Author
   }
 `
 
@@ -162,6 +167,18 @@ const mutateAddBook = (root, args) => {
   return book;
 }
 
+const mutateEditAuthor = (root, args) => {
+  const { name, setBornTo } = args;
+  let author = null;
+  if (name) {
+    author = authors.find(a => a.name === name);
+  }
+  if (author && setBornTo) {
+    author.born = setBornTo;
+  }
+  return author;
+}
+
 const resolvers = {
   Query: {
     bookCount: resolveBookCount,
@@ -170,7 +187,8 @@ const resolvers = {
     allAuthors: resolveAllAuthors,
   },
   Mutation: {
-    addBook: mutateAddBook
+    addBook: mutateAddBook,
+    editAuthor: mutateEditAuthor
   }
 }
 
