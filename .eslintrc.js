@@ -65,8 +65,6 @@ module.exports = {
         "func-name-matching": "error",
         "func-names": "error",
         "func-style": "error",
-        "function-call-argument-newline": "error",
-        "function-paren-newline": "error",
         "generator-star-spacing": "error",
         "global-require": "error",
         "grouped-accessor-pairs": "error",
@@ -107,7 +105,6 @@ module.exports = {
             "error",
             "always"
         ],
-        "newline-before-return": "error",
         "newline-per-chained-call": "error",
         "no-alert": "error",
         "no-array-constructor": "error",

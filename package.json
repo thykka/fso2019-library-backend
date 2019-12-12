@@ -4,6 +4,7 @@
   "description": "",
   "main": "library-backend.js",
   "scripts": {
+    "start": "node library-backend.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Moses Holmström",
