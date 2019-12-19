@@ -1,89 +1,17 @@
-const { ApolloServer, gql } = require('apollo-server')
-const uuid = require('uuid/v1')
+const { ApolloServer, UserInputError, gql } = require('apollo-server');
+const uuid = require('uuid/v1');
+const mongoose = require('mongoose');
+const Book = require('./models/book');
+const Author = require('./models/author');
 
-let authors = [
-  {
-    name: 'Robert Martin',
-    id: "afa51ab0-344d-11e9-a414-719c6709cf3e",
-    born: 1952,
-  },
-  {
-    name: 'Martin Fowler',
-    id: "afa5b6f0-344d-11e9-a414-719c6709cf3e",
-    born: 1963
-  },
-  {
-    name: 'Fyodor Dostoevsky',
-    id: "afa5b6f1-344d-11e9-a414-719c6709cf3e",
-    born: 1821
-  },
-  {
-    name: 'Joshua Kerievsky', // birthyear not known
-    id: "afa5b6f2-344d-11e9-a414-719c6709cf3e",
-  },
-  {
-    name: 'Sandi Metz', // birthyear not known
-    id: "afa5b6f3-344d-11e9-a414-719c6709cf3e",
-  },
-]
+mongoose.set('useFindAndModify', false);
 
-/*
- * It would be more sensible to assosiate book and the author by saving
- * the author id instead of the name to the book.
- * For simplicity we however save the author name.
-*/
+const MONGODB_URI = getMongoDbUri();
 
-let books = [
-  {
-    title: 'Clean Code',
-    published: 2008,
-    author: 'Robert Martin',
-    id: "afa5b6f4-344d-11e9-a414-719c6709cf3e",
-    genres: ['refactoring']
-  },
-  {
-    title: 'Agile software development',
-    published: 2002,
-    author: 'Robert Martin',
-    id: "afa5b6f5-344d-11e9-a414-719c6709cf3e",
-    genres: ['agile', 'patterns', 'design']
-  },
-  {
-    title: 'Refactoring, edition 2',
-    published: 2018,
-    author: 'Martin Fowler',
-    id: "afa5de00-344d-11e9-a414-719c6709cf3e",
-    genres: ['refactoring']
-  },
-  {
-    title: 'Refactoring to patterns',
-    published: 2008,
-    author: 'Joshua Kerievsky',
-    id: "afa5de01-344d-11e9-a414-719c6709cf3e",
-    genres: ['refactoring', 'patterns']
-  },
-  {
-    title: 'Practical Object-Oriented Design, An Agile Primer Using Ruby',
-    published: 2012,
-    author: 'Sandi Metz',
-    id: "afa5de02-344d-11e9-a414-719c6709cf3e",
-    genres: ['refactoring', 'design']
-  },
-  {
-    title: 'Crime and punishment',
-    published: 1866,
-    author: 'Fyodor Dostoevsky',
-    id: "afa5de03-344d-11e9-a414-719c6709cf3e",
-    genres: ['classic', 'crime']
-  },
-  {
-    title: 'The Demon',
-    published: 1872,
-    author: 'Fyodor Dostoevsky',
-    id: "afa5de04-344d-11e9-a414-719c6709cf3e",
-    genres: ['classic', 'revolution']
-  },
-]
+mongoose.connect(MONGODB_URI, { useNewUrlParser: true })
+  .then(() => console.log('Mongo Connected!'))
+  .catch(e => 'Mongo not connected; ' + e.message);
+
 
 const typeDefs = gql`
   type Book {
@@ -105,8 +33,9 @@ const typeDefs = gql`
     hello: String!
     bookCount: Int!
     authorCount: Int!
-    allBooks(author: String, genre: String): [Book!]
+    allBooks: [Book!]
     allAuthors: [Author!]!
+    findBook(author: String, title: String, genre: String): [Book!]
   }
 
   type Mutation {
@@ -124,47 +53,22 @@ const typeDefs = gql`
   }
 `
 
-const resolveBookCount = () => books.length;
+const resolveBookCount = () => Book.collection.countDocuments();
+const resolveAuthorCount = () => Author.collection.countDocuments();
 
-const resolveAuthorCount = () => Object.keys(
-  books.reduce((authorsObj, book) => {
-    authorsObj[book.author] = true
-    return authorsObj
-  }, {})
-).length;
+const resolveAllBooks = () => Book.find({});
 
-const resolveAllBooks = (root, { author, genre } = {}) => {
-  let results = [...books];
-  if (author) {
-    results = results.filter(book => book.author === author);
+const resolveFindBook = (root, { author, genre } = {}) => Book.findOne({ author, genre });
+
+const resolveAllAuthors = () => Author.find({});
+
+const mutateAddBook = async (root, args) => {
+  let author = await Author.findOne({ name: args.author });
+  if(!author) {
+    author = await new Author({ name: args.author }).save();
   }
-  if (genre) {
-    results = results.filter(book =>
-      Array.isArray(book.genres) && book.genres.includes(genre)
-    );
-  }
-  return results;
-};
-
-const resolveAllAuthors = () => {
-  return authors.map(author => ({
-    ...author,
-    bookCount: books.filter(
-      book => book.author === author.name
-    ).length
-  }));
-};
-
-const mutateAddBook = (root, args) => {
-  const book = { ...args, id: uuid() }
-  books = books.concat(book);
-  if (!authors.find(author => author.name === book.author)) {
-    authors = authors.concat({
-      name: book.author,
-      id: uuid()
-    });
-  }
-  return book;
+  const book = new Book({ ...args, author: author.id });
+  return book.save();
 }
 
 const mutateEditAuthor = (root, args) => {
@@ -185,6 +89,7 @@ const resolvers = {
     authorCount: resolveAuthorCount,
     allBooks: resolveAllBooks,
     allAuthors: resolveAllAuthors,
+    findBook: resolveFindBook
   },
   Mutation: {
     addBook: mutateAddBook,
@@ -200,3 +105,32 @@ const server = new ApolloServer({
 server.listen().then(({ url }) => {
   console.log(`Server ready at ${url}`)
 })
+
+
+function getMongoDbUri() {
+  let dbUser = process.argv[2];
+  let dbPass = process.argv[3];
+
+  console.log(process.argv.length);
+
+  if(process.argv.length <= 2) {
+    console.log('Attempting login with environment credentials');
+    dbUser = process.env.DB_USER;
+    dbPass = process.env.DB_PASS;
+    console.log(dbUser);
+  } else {
+    dbUser = process.argv[2];
+    dbPass = process.argv[3];
+  }
+
+  if(!dbUser || !dbPass) {
+    console.log('Missing login credentials. Add <dbUser> <dbPass> as arguments.');
+    process.exit(1);
+  }
+
+  return `mongodb+srv://${
+    dbUser
+  }:${
+    dbPass
+  }@thykka-fso2k19-cswvc.mongodb.net/books?retryWrites=true&w=majority`;
+}
