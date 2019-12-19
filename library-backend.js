@@ -14,19 +14,19 @@ mongoose.connect(MONGODB_URI, { useNewUrlParser: true })
 
 
 const typeDefs = gql`
-  type Book {
-    title: String!
-    published: Int
-    author: String!
-    id: ID!
-    genres: [String!]
-  }
-
   type Author {
     name: String!
     bookCount: Int!
     born: Int
     id: ID!
+  }
+
+  type Book {
+    title: String!
+    published: Int
+    author: Author!
+    id: ID!
+    genres: [String!]
   }
 
   type Query {
@@ -56,7 +56,7 @@ const typeDefs = gql`
 const resolveBookCount = () => Book.collection.countDocuments();
 const resolveAuthorCount = () => Author.collection.countDocuments();
 
-const resolveAllBooks = () => Book.find({});
+const resolveAllBooks = () => Book.find({}).populate('author');
 
 const resolveFindBook = (root, { author, genre } = {}) => Book.findOne({ author, genre });
 
