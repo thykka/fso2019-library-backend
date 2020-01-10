@@ -1,5 +1,5 @@
 const { ApolloServer, UserInputError, gql } = require('apollo-server');
-const uuid = require('uuid/v1');
+// const uuid = require('uuid/v1');
 const mongoose = require('mongoose');
 const Book = require('./models/book');
 const Author = require('./models/author');
@@ -9,9 +9,6 @@ mongoose.set('useFindAndModify', false);
 const MONGODB_URI = getMongoDbUri();
 
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true })
-  .then(() => console.log('Mongo Connected!'))
-  .catch(e => 'Mongo not connected; ' + e.message);
-
 
 const typeDefs = gql`
   type Author {
@@ -35,21 +32,25 @@ const typeDefs = gql`
     authorCount: Int!
     allBooks: [Book!]
     allAuthors: [Author!]!
-    findBook(author: String, title: String, genre: String): [Book!]
+    findBooks(
+      author: String,
+      title: String,
+      genre: String
+    ): [Book!]
   }
 
   type Mutation {
     addBook(
       title: String!
-      author: String!
+      authorName: String!
       published: Int
       genres: [String!]
-    ) : Book
+    ): Book
 
     editAuthor(
       name: String!
       setBornTo: Int
-    ) : Author
+    ): Author
   }
 `
 
@@ -58,17 +59,44 @@ const resolveAuthorCount = () => Author.collection.countDocuments();
 
 const resolveAllBooks = () => Book.find({}).populate('author');
 
-const resolveFindBook = (root, { author, genre } = {}) => Book.findOne({ author, genre });
+const resolveFindBooks = async (root, { title, author, genre } = {}) => {
+  const foundBooks = await Book.find({ title, author: {name:author}, genre });
+  return foundBooks;
+};
 
 const resolveAllAuthors = () => Author.find({});
 
+const resolveAuthorBookCount = async (root) => {
+  const authorBooks = await Book.find({ author: root });
+  return authorBooks.length;
+};
+
 const mutateAddBook = async (root, args) => {
-  let author = await Author.findOne({ name: args.author });
-  if(!author) {
-    author = await new Author({ name: args.author }).save();
+  const { authorName, title, published, genres } = args;
+  let author = await Author.findOne({ name: authorName });
+  if(!author && authorName) {
+    author = new Author({ name: authorName });
+    try {
+      await author.save();
+    } catch(e) {
+      throw new UserInputError(e.message, { invalidArgs: args });
+    }
+    console.log('New author!');
   }
-  const book = new Book({ ...args, author: author.id });
-  return book.save();
+  console.log(`Using author: ${ JSON.stringify(author, null, 2) }`);
+  const book = new Book({
+    title,
+    author: author.id,
+    published,
+    genres
+  });
+  try {
+    await book.save()
+  } catch(e) {
+    throw new UserInputError(e.message, { invalidArgs: args });
+  }
+  console.log(`New book: ${ JSON.stringify({ book: Book.populate(book, { path: 'author' }) }, null, 2) }`);
+  return Book.populate(book, 'author');
 }
 
 const mutateEditAuthor = async (root, args) => {
@@ -87,11 +115,15 @@ const mutateEditAuthor = async (root, args) => {
 
 const resolvers = {
   Query: {
+    hello: () => 'hello',
     bookCount: resolveBookCount,
     authorCount: resolveAuthorCount,
     allBooks: resolveAllBooks,
     allAuthors: resolveAllAuthors,
-    findBook: resolveFindBook
+    findBooks: resolveFindBooks
+  },
+  Author: {
+    bookCount: resolveAuthorBookCount
   },
   Mutation: {
     addBook: mutateAddBook,
@@ -102,6 +134,7 @@ const resolvers = {
 const server = new ApolloServer({
   typeDefs,
   resolvers,
+  connectToDevTools: true
 })
 
 server.listen().then(({ url }) => {
