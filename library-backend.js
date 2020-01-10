@@ -71,16 +71,18 @@ const mutateAddBook = async (root, args) => {
   return book.save();
 }
 
-const mutateEditAuthor = (root, args) => {
+const mutateEditAuthor = async (root, args) => {
   const { name, setBornTo } = args;
   let author = null;
   if (name) {
-    author = authors.find(a => a.name === name);
+    author = await Author.findOne({ name });
   }
   if (author && setBornTo) {
     author.born = setBornTo;
+  } else {
+    return null;
   }
-  return author;
+  return author.save();
 }
 
 const resolvers = {
