@@ -1,11 +1,14 @@
 const { ApolloServer, UserInputError, gql } = require('apollo-server');
-// const uuid = require('uuid/v1');
+const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Book = require('./models/book');
 const Author = require('./models/author');
+const User = require('./models/user');
 
 mongoose.set('useFindAndModify', false);
 
+const COMMON_PASSWORD = '1ns3cur3';
+const JWT_SECRET = 'PIENLENTOKONESUIHKUTURBIINIVARAMOOTTORIAPUMEKAANIKKOKOKELAS';
 const MONGODB_URI = getMongoDbUri();
 
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true })
@@ -26,8 +29,17 @@ const typeDefs = gql`
     genres: [String!]
   }
 
+  type User {
+    username: String!
+    favoriteGenre: String
+    id: ID!
+  }
+
+  type Token {
+    value: String!
+  }
+
   type Query {
-    hello: String!
     bookCount: Int!
     authorCount: Int!
     allBooks: [Book!]
@@ -39,6 +51,7 @@ const typeDefs = gql`
       title: String,
       genre: String
     ): [Book!]
+    me: User
   }
 
   type Mutation {
@@ -47,12 +60,24 @@ const typeDefs = gql`
       authorName: String!
       published: Int
       genres: [String!]
+      token: String!
     ): Book
 
     editAuthor(
       name: String!
       setBornTo: Int
+      token: String!
     ): Author
+
+    createUser(
+      username: String!
+      favoriteGenre: String
+    ): User
+
+    login(
+      username: String!
+      password: String!
+    ): Token
   }
 `
 
@@ -74,7 +99,10 @@ const resolveAuthorBookCount = async (root) => {
 };
 
 const mutateAddBook = async (root, args) => {
-  const { authorName, title, published, genres } = args;
+  const { authorName, title, published, genres, token } = args;
+  if(!token || !jwt.verify(token, JWT_SECRET)) {
+    throw new UserInputError('Missing or invalid token', { invalidArgs: args });
+  }
   if(!title) {
     throw new UserInputError('Missing `title`', { invalidArgs: args });
   }
@@ -110,7 +138,10 @@ const mutateAddBook = async (root, args) => {
 }
 
 const mutateEditAuthor = async (root, args) => {
-  const { name, setBornTo } = args;
+  const { name, setBornTo, token } = args;
+  if(!token || !jwt.verify(token, JWT_SECRET)) {
+    throw new UserInputError('Missing or invalid token', { invalidArgs: args });
+  }
   if(!name) {
     throw new UserInputError('Missing `name`', { invalidArgs: args });
   }
@@ -136,9 +167,35 @@ const mutateEditAuthor = async (root, args) => {
   }
 }
 
+const mutateCreateUser = (root, args) => {
+  const user = new User({ username: args.username })
+
+  return user.save()
+    .catch(error => {
+      throw new UserInputError(error.message, {
+        invalidArgs: args,
+      })
+    })
+};
+const mutateLogin = async (root, args) => {
+  const user = await User.findOne({ username: args.username })
+
+  console.log(user, args.password);
+
+  if ( !user || args.password !== COMMON_PASSWORD ) {
+    throw new UserInputError("wrong credentials")
+  }
+
+  const userForToken = {
+    username: user.username,
+    id: user._id,
+  }
+
+  return { value: jwt.sign(userForToken, JWT_SECRET) }
+};
+
 const resolvers = {
   Query: {
-    hello: () => 'hello',
     bookCount: resolveBookCount,
     authorCount: resolveAuthorCount,
     allBooks: resolveAllBooks,
@@ -150,7 +207,9 @@ const resolvers = {
   },
   Mutation: {
     addBook: mutateAddBook,
-    editAuthor: mutateEditAuthor
+    editAuthor: mutateEditAuthor,
+    createUser: mutateCreateUser,
+    login: mutateLogin,
   }
 }
 
