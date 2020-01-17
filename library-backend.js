@@ -31,7 +31,9 @@ const typeDefs = gql`
     bookCount: Int!
     authorCount: Int!
     allBooks: [Book!]
-    allAuthors: [Author!]!
+    allAuthors(
+      author: String
+    ): [Author!]!
     findBooks(
       author: String,
       title: String,
@@ -73,17 +75,26 @@ const resolveAuthorBookCount = async (root) => {
 
 const mutateAddBook = async (root, args) => {
   const { authorName, title, published, genres } = args;
+  if(!title) {
+    throw new UserInputError('Missing `title`', { invalidArgs: args });
+  }
+  if(!authorName) {
+    throw new UserInputError('Missing `authorName`', { invalidArgs: args });
+  }
+  if(published > new Date().getFullYear()) {
+    throw new UserInputError('Cannot add book that hasn\'t been published yet', { invalidArgs: args })
+  }
+  // Find the author, or create if doesn't exist
   let author = await Author.findOne({ name: authorName });
-  if(!author && authorName) {
+  if(!author) {
     author = new Author({ name: authorName });
     try {
       await author.save();
     } catch(e) {
       throw new UserInputError(e.message, { invalidArgs: args });
     }
-    console.log('New author!');
   }
-  console.log(`Using author: ${ JSON.stringify(author, null, 2) }`);
+  // create and save the book
   const book = new Book({
     title,
     author: author.id,
@@ -95,22 +106,34 @@ const mutateAddBook = async (root, args) => {
   } catch(e) {
     throw new UserInputError(e.message, { invalidArgs: args });
   }
-  console.log(`New book: ${ JSON.stringify({ book: Book.populate(book, { path: 'author' }) }, null, 2) }`);
   return Book.populate(book, 'author');
 }
 
 const mutateEditAuthor = async (root, args) => {
   const { name, setBornTo } = args;
-  let author = null;
-  if (name) {
-    author = await Author.findOne({ name });
+  if(!name) {
+    throw new UserInputError('Missing `name`', { invalidArgs: args });
   }
-  if (author && setBornTo) {
-    author.born = setBornTo;
-  } else {
-    return null;
+  if(!setBornTo) {
+    throw new UserInputError('Missing `setBornTo`', { invalidArgs: args });
   }
-  return author.save();
+  if(setBornTo > new Date().getFullYear()) {
+    throw new UserInputError('Author is born in the future!?', { invalidArgs: args })
+  }
+  const author = await Author.findOne({ name });
+
+  if (!author) {
+    // this should probably be the GraphQL-equivalent of a 404...
+    throw new UserInputError('No such author');
+  }
+
+  author.born = setBornTo;
+
+  try {
+    return author.save();
+  } catch(e) {
+    throw new UserInputError(e.message, { invalidArgs: args })
+  }
 }
 
 const resolvers = {
